@@ -331,3 +331,18 @@ def test_graph_eval_reports_recall_and_groundedness(monkeypatch, built_graph, tm
     metrics = evaluate.run_graph()
     assert metrics["graph_recall"] == (1, 1)
     assert metrics["groundedness"] == (2, 2)
+
+
+# --- keyless invariant: graph pipeline never imports anthropic/kuzu/torch -----
+import sys
+
+
+def test_graph_pipeline_is_keyless_no_heavy_imports(monkeypatch, graph, tmp_path):
+    src = _graph_corpus(tmp_path)
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    ingest.build(src)
+    ask("how are grounded and tailored connected?")
+    assert "anthropic" not in sys.modules
+    assert "kuzu" not in sys.modules
+    assert "torch" not in sys.modules

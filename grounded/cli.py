@@ -14,7 +14,12 @@ def main() -> None:
     ask_p = sub.add_parser("ask", help="ask a question")
     ask_p.add_argument("question")
 
-    sub.add_parser("eval", help="score retrieval + groundedness on the labelled set")
+    eval_p = sub.add_parser("eval", help="score retrieval + groundedness on the labelled set")
+    eval_p.add_argument(
+        "--graph",
+        action="store_true",
+        help="score the knowledge graph (graph-recall + groundedness) instead",
+    )
 
     args = parser.parse_args()
 
@@ -22,8 +27,12 @@ def main() -> None:
         from .ingest import build
 
         stats = build()
-        print(f"indexed {stats['chunks']} chunks from {stats['files']} files "
-              f"({stats['ip_dropped']} dropped by ip-guard)")
+        if "nodes" in stats:  # graph / hybrid build
+            print(f"built graph: {stats['nodes']} nodes, {stats['edges']} edges "
+                  f"from {stats['files']} files")
+        else:  # vector build
+            print(f"indexed {stats['chunks']} chunks from {stats['files']} files "
+                  f"({stats['ip_dropped']} dropped by ip-guard)")
 
     elif args.cmd == "ask":
         from .query import ask
@@ -38,9 +47,9 @@ def main() -> None:
             print(f"\n(abstained: {a.reason})", file=sys.stderr)
 
     elif args.cmd == "eval":
-        from .evaluate import run
+        from .evaluate import run, run_graph
 
-        run()
+        run_graph() if args.graph else run()
 
 
 if __name__ == "__main__":

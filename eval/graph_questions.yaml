@@ -1,0 +1,47 @@
+# Labelled multi-hop set for the knowledge graph, mirroring eval/questions.yaml.
+# Build the graph first:  GROUNDED_RETRIEVAL_MODE=graph grounded ingest
+# then score it:          GROUNDED_RETRIEVAL_MODE=graph grounded eval --graph
+#
+# Each item:
+#   q:          the multi-hop / structural question
+#   entities:   node names the traversed path MUST cover (graph-recall check);
+#               omit for a question that should abstain
+#   answerable: false means the graph SHOULD abstain (no connecting path / no
+#               known entity) -- this tests the gate, not recall
+#
+# Entity names are the public Project/Technology/Concept nodes the rule extractor
+# mints from the corpus in sources.yaml. No codenames, no employer IP.
+
+# --- multi-hop: two projects connected through a shared technology/concept ---
+- q: "How are grounded and tailored connected?"
+  entities: ["grounded", "tailored"]
+  answerable: true
+
+- q: "What links grounded and interlock?"
+  entities: ["grounded", "interlock"]
+  answerable: true
+
+# --- project <-> technology (one or two hops) ---
+- q: "What connects grounded and Qdrant?"
+  entities: ["grounded", "Qdrant"]
+  answerable: true
+
+- q: "How is tailored related to Qdrant?"
+  entities: ["tailored", "Qdrant"]
+  answerable: true
+
+- q: "What ties tailored to FastAPI?"
+  entities: ["tailored", "FastAPI"]
+  answerable: true
+
+# --- single-entity neighbourhood (still grounded in real edges) ---
+- q: "What does grounded use and apply?"
+  entities: ["grounded"]
+  answerable: true
+
+# --- should abstain: no known entity in the question, no path to traverse ---
+- q: "What is the capital of France?"
+  answerable: false
+
+- q: "What did Farshad cook for dinner yesterday?"
+  answerable: false
