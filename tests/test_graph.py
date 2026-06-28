@@ -188,3 +188,43 @@ def test_graph_evidence_matches_dictionary_alias(built_graph):
     # 'qdrant' alias resolves to the Qdrant node, single-entity neighbourhood
     paths = gquery.graph_evidence("anything using qdrant?")
     assert any("lonely" in p.nodes() for p in paths)
+
+
+# --- end-to-end: graph mode through query.ask ---------------------------------
+from grounded import config
+from grounded.query import ABSTAIN, ask
+
+
+@pytest.fixture
+def graph_mode(monkeypatch, built_graph):
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    return built_graph
+
+
+def test_graph_mode_multi_hop_answers_grounded_and_cited(graph_mode):
+    ans = ask("how are grounded and tailored connected?")
+    assert ans.grounded
+    assert ans.citations
+    assert "ACME-SECRET" not in ans.text
+
+
+def test_graph_mode_no_path_abstains(graph_mode):
+    ans = ask("connect grounded and lonely")
+    assert not ans.grounded
+    assert ans.text == ABSTAIN
+
+
+def test_graph_mode_unknown_entity_abstains(graph_mode):
+    ans = ask("what is the capital of France?")
+    assert not ans.grounded
+    assert ans.text == ABSTAIN
+
+
+def test_graph_mode_empty_graph_abstains_gracefully(monkeypatch, graph):
+    # no triples added: graph mode must abstain, not crash
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    ans = ask("how are grounded and tailored connected?")
+    assert not ans.grounded
+    assert ans.text == ABSTAIN
