@@ -146,3 +146,45 @@ def test_cyclic_graph_traversal_is_bounded(graph):
     paths = graph.shortest_paths("a", "c", max_hops=3)
     assert paths
     assert min(len(p.steps) for p in paths) == 1  # a-c is direct
+
+
+# --- graph query: entity matching -> evidence paths ---------------------------
+from grounded.graph import query as gquery
+
+
+@pytest.fixture
+def built_graph(graph):
+    graph.add_triples([
+        extract.Triple("grounded", "Project", terms.USES, "Python", "Technology"),
+        extract.Triple("tailored", "Project", terms.USES, "Python", "Technology"),
+        extract.Triple("grounded", "Project", terms.APPLIES, "RAG", "Concept"),
+        extract.Triple("lonely", "Project", terms.USES, "Qdrant", "Technology"),
+    ])
+    return graph
+
+
+def test_graph_evidence_two_entities_returns_connecting_path(built_graph):
+    paths = gquery.graph_evidence("how are grounded and tailored connected?")
+    assert paths
+    assert "Python" in paths[0].nodes()
+
+
+def test_graph_evidence_single_entity_returns_neighbourhood(built_graph):
+    paths = gquery.graph_evidence("tell me about grounded")
+    reached = {n for p in paths for n in p.nodes()}
+    assert "Python" in reached and "RAG" in reached
+
+
+def test_graph_evidence_no_known_entity_is_empty(built_graph):
+    assert gquery.graph_evidence("what is the capital of France?") == []
+
+
+def test_graph_evidence_entities_present_but_no_path_is_empty(built_graph):
+    # grounded and lonely share nothing
+    assert gquery.graph_evidence("connect grounded and lonely") == []
+
+
+def test_graph_evidence_matches_dictionary_alias(built_graph):
+    # 'qdrant' alias resolves to the Qdrant node, single-entity neighbourhood
+    paths = gquery.graph_evidence("anything using qdrant?")
+    assert any("lonely" in p.nodes() for p in paths)
