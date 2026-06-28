@@ -209,6 +209,17 @@ def test_graph_mode_multi_hop_answers_grounded_and_cited(graph_mode):
     assert "ACME-SECRET" not in ans.text
 
 
+def test_graph_hit_carries_its_path_and_cited_paths_derive_from_it(graph_mode):
+    # The folded seam: each graph citation is self-describing -- it carries the
+    # GraphPath it was rendered from, and Answer.paths is just those paths.
+    ans = ask("how are grounded and tailored connected?")
+    graph_cites = [h for h in ans.citations if h.source == "graph"]
+    assert graph_cites and all(h.path is not None for h in graph_cites)
+    assert ans.paths == [h.path for h in graph_cites]
+    # a plain vector Hit defaults to no path
+    assert vstore.Hit(id=0, score=0.0, source="x", heading="h", text="t").path is None
+
+
 def test_graph_mode_no_path_abstains(graph_mode):
     ans = ask("connect grounded and lonely")
     assert not ans.grounded

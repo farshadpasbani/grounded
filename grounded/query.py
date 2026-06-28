@@ -34,7 +34,7 @@ def _path_to_hit(idx: int, path: GraphPath) -> Hit:
     """A traversal path as a citeable piece of evidence. score=1.0: a real path
     is a hard structural fact, not a similarity score."""
     rendered = path.render()
-    return Hit(id=idx, score=1.0, source="graph", heading=rendered, text=rendered)
+    return Hit(id=idx, score=1.0, source="graph", heading=rendered, text=rendered, path=path)
 
 
 def ask(question: str) -> Answer:
@@ -61,8 +61,13 @@ def _ask_vector(question: str) -> Answer:
     return Answer(result["answer"], grounded=True, citations=cited, reason=reason)
 
 
-def _answer_from_evidence(question: str, evidence: list[Hit], paths: list[GraphPath]) -> Answer:
-    """Generate over a fixed evidence set and gate the result."""
+def _answer_from_evidence(question: str, evidence: list[Hit]) -> Answer:
+    """Generate over a fixed evidence set and gate the result.
+
+    Evidence is self-describing: a graph hit carries its own `path`, so the
+    cited paths fall straight out of the cited hits -- no parallel list to
+    re-zip and keep aligned.
+    """
     if not evidence:
         return Answer(ABSTAIN, grounded=False, reason="no connecting path or chunk")
 
@@ -73,18 +78,14 @@ def _answer_from_evidence(question: str, evidence: list[Hit], paths: list[GraphP
 
     cited_ids = set(result["citations"])
     cited = [h for h in evidence if h.id in cited_ids]
-    cited_paths = [p for h, p in zip(_graph_hits(evidence), paths) if h.id in cited_ids] if paths else []
+    cited_paths = [h.path for h in cited if h.path]
     return Answer(result["answer"], grounded=True, citations=cited, reason=reason, paths=cited_paths)
-
-
-def _graph_hits(evidence: list[Hit]) -> list[Hit]:
-    return [h for h in evidence if h.source == "graph"]
 
 
 def _ask_graph(question: str) -> Answer:
     paths = graph_query.graph_evidence(question)
     evidence = [_path_to_hit(i, p) for i, p in enumerate(paths)]
-    return _answer_from_evidence(question, evidence, paths)
+    return _answer_from_evidence(question, evidence)
 
 
 def _ask_hybrid(question: str) -> Answer:
@@ -100,4 +101,4 @@ def _ask_hybrid(question: str) -> Answer:
         evidence.append(_path_to_hit(0, p))  # id reassigned below
     for i, h in enumerate(evidence):
         h.id = i
-    return _answer_from_evidence(question, evidence, paths)
+    return _answer_from_evidence(question, evidence)

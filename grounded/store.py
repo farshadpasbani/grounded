@@ -9,6 +9,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from .chunk import Chunk
 from .config import settings
+from .graph.types import GraphPath
 
 
 @dataclass
@@ -18,6 +19,9 @@ class Hit:
     source: str
     heading: str
     text: str
+    # When this hit is a graph traversal rendered as evidence, the path it came
+    # from -- so evidence is self-describing (no parallel path list to re-zip).
+    path: GraphPath | None = None
 
 
 @lru_cache(maxsize=1)
