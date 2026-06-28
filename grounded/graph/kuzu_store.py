@@ -76,15 +76,14 @@ class KuzuGraph:
         if not self.has_node(name) or hops < 1:
             return []
         res = self._conn.execute(
-            "MATCH (a:Entity {name: $n})-[r:REL]-(b:Entity) "
-            "RETURN a.name, r.predicate, b.name, "
-            "startNode(r).name = a.name AS forward",
+            "MATCH (a:Entity {name: $n})-[r:REL]-(b:Entity) RETURN a, r, b",
             {"n": name},
         )
         out: list[GraphPath] = []
         while res.has_next():
-            src, pred, dst, forward = res.get_next()
-            out.append(GraphPath((Step(src, pred, dst, bool(forward)),)))
+            a, r, b = res.get_next()
+            forward = r["_src"]["offset"] == a["_id"]["offset"]
+            out.append(GraphPath((Step(a["name"], r["predicate"], b["name"], forward),)))
         return out
 
     def shortest_paths(self, a: str, b: str, max_hops: int) -> list[GraphPath]:

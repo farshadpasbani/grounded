@@ -55,7 +55,9 @@ def _rule(docs: list[Doc]) -> list[Triple]:
         if project_terms[a] & project_terms[b]:
             triples.append(Triple(a, terms.Project, terms.RELATED_TO, b, terms.Project))
 
-    return triples
+    # Dedupe (heading collisions across files can mint the same triple twice),
+    # preserving order, so the in-memory and kuzu backends report identical stats.
+    return list(dict.fromkeys(triples))
 
 
 def _llm(docs: list[Doc]) -> list[Triple]:  # pragma: no cover - secondary path
