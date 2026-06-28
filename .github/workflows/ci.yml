@@ -15,9 +15,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Offline test suite: the tests fake embeddings, so the light extra (no
-      # torch / sentence-transformers) is all CI needs. [dev] pulls pytest;
-      # [embed] (the heavy ML stack) is deliberately excluded.
+      # Offline test suite: the tests fake embeddings and use the in-memory graph
+      # seam (GRAPH_PATH=:memory:), so the light extra is all CI needs — no torch,
+      # no kuzu, no Docker, no API key. [dev] pulls pytest; [embed] (torch) and
+      # [graph] (kuzu) are deliberately excluded.
       - name: Install
         run: pip install -e '.[dev]'
 
