@@ -286,3 +286,27 @@ def test_hybrid_abstains_when_neither_grounds(hybrid_mode):
     ans = ask("zxqw plooble grommet flarn unrelated nonsense")
     assert not ans.grounded
     assert ans.text == ABSTAIN
+
+
+# --- ingest builds the knowledge graph in graph mode --------------------------
+def _graph_corpus(tmp_path):
+    (tmp_path / "grounded.md").write_text("# grounded\ngrounded is RAG in Python with Qdrant.\n")
+    (tmp_path / "tailored.md").write_text("# tailored\ntailored runs deterministic gates in Python.\n")
+    (tmp_path / "secret.md").write_text("# ACME-SECRET\nthe ACME-SECRET tool uses Python.\n")
+    src = tmp_path / "sources.yaml"
+    src.write_text(f"globs:\n  - '{tmp_path}/*.md'\n")
+    return str(src)
+
+
+def test_graph_mode_ingest_builds_graph_and_ip_guards(monkeypatch, graph, tmp_path):
+    src = _graph_corpus(tmp_path)
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    stats = ingest.build(src)
+    assert stats["nodes"] > 0 and stats["edges"] > 0
+    names = graph.node_names()
+    assert "grounded" in names and "tailored" in names and "Python" in names
+    assert "ACME-SECRET" not in names  # protected project never enters the graph
+    # the freshly built graph answers a multi-hop question
+    ans = ask("how are grounded and tailored connected?")
+    assert ans.grounded
