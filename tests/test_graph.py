@@ -192,7 +192,24 @@ def test_graph_evidence_matches_dictionary_alias(built_graph):
 
 # --- end-to-end: graph mode through query.ask ---------------------------------
 from grounded import config
-from grounded.query import ABSTAIN, ask
+from grounded.query import ABSTAIN, _assemble, _path_to_hit, ask
+from grounded.graph.types import GraphPath, Step
+
+
+def test_assemble_assigns_contiguous_collision_free_ids_and_keeps_paths():
+    # vector hits arrive with arbitrary (here colliding) ids; _assemble is the
+    # one chokepoint that reissues a flat 0..n-1 id space across both kinds.
+    vhits = [
+        vstore.Hit(id=7, score=0.9, source="doc", heading="a", text="ta"),
+        vstore.Hit(id=7, score=0.8, source="doc", heading="b", text="tb"),
+    ]
+    paths = [GraphPath((Step("p", "USES", "Python", True),))]
+    out = _assemble(vhits, paths)
+    assert [h.id for h in out] == [0, 1, 2]  # contiguous, no collision
+    assert out[0].text == "ta" and out[1].text == "tb"  # vector fields preserved
+    assert out[2].source == "graph" and out[2].path == paths[0]  # path carried
+    # non-mutating: the caller's hits keep their original ids
+    assert [h.id for h in vhits] == [7, 7]
 
 
 @pytest.fixture
