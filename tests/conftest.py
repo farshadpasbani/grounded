@@ -11,3 +11,6 @@ os.environ["GROUNDED_MIN_SCORE"] = "0.05"
 # A fake protected term so the ip-guard tests exercise the mechanism without
 # putting any real codename in the repo.
 os.environ["GROUNDED_PROTECTED_TOPICS"] = "ACME-SECRET"
+# Graph store: pure-python in-memory seam (no kuzu, no torch). The kuzu backend
+# is selected only when GRAPH_PATH points at an embedded directory.
+os.environ["GRAPH_PATH"] = ":memory:"

@@ -41,6 +41,38 @@ gate, and a labelled eval set (recall@k + groundedness).
 - Pluggable generation: `stub` (deterministic, no key — for development) or
   `claude` (`claude-opus-4-8`, structured outputs — production)
 
+## Graph retrieval (vector + knowledge graph)
+
+Vector search finds what is *semantically related*; a knowledge graph finds what
+is *structurally connected* — the multi-hop questions a similarity search cannot
+answer ("how are grounded and tailored connected?"). `grounded` runs both behind
+the same grounding-gate thesis: an answer must map to a real graph path, or it
+abstains. No fabricated relationships.
+
+```
+GROUNDED_RETRIEVAL_MODE = vector (default) | graph | hybrid
+ingest (graph):  sources -> rule-extract typed triples (ip-guarded) -> graph store
+query  (graph):  question -> match entities -> shortest path / neighbourhood
+                          -> gate: abstain on no path; cite the traversed path
+hybrid:          union vector chunks + graph paths; answer if EITHER grounds it
+```
+
+- **Extractor is pluggable**: `rule` (deterministic, keyless, default) scans the
+  corpus against a curated public dictionary (`grounded/graph/terms.py`) to mint
+  `Project` / `Technology` / `Concept` nodes and `USES` / `APPLIES` / `RELATED_TO`
+  edges. `llm` (Claude structured output) is wired behind the same interface and
+  imported lazily, so the keyless path never touches the SDK.
+- **Store**: embedded KuzuDB (Cypher, no Docker) for production; a pure-python
+  in-memory seam (`GRAPH_PATH=:memory:`) for the offline tests, so CI needs
+  neither kuzu nor torch. `GRAPH_MAX_HOPS` bounds traversal (cycles can't run
+  away). KuzuDB has no Python 3.14 wheel yet — install `'.[graph]'` under 3.13.
+
+```sh
+GROUNDED_RETRIEVAL_MODE=graph grounded ingest          # build the graph
+GROUNDED_RETRIEVAL_MODE=graph grounded ask "how are grounded and tailored connected?"
+GROUNDED_RETRIEVAL_MODE=graph grounded eval --graph    # graph-recall + groundedness
+```
+
 ## Develop without an API key
 
 Only generation talks to Claude. Embeddings are a local model and the vector DB
@@ -74,6 +106,10 @@ PYTHONHASHSEED=0 pytest -q
 | var | default | meaning |
 | --- | --- | --- |
 | `GROUNDED_GENERATOR` | `stub` | `stub` (no key) or `claude` |
+| `GROUNDED_RETRIEVAL_MODE` | `vector` | `vector`, `graph`, or `hybrid` |
+| `GROUNDED_EXTRACTOR` | `rule` | `rule` (keyless) or `llm` (Claude) |
+| `GRAPH_PATH` | `:memory:` | in-memory seam, or an embedded KuzuDB dir |
+| `GRAPH_MAX_HOPS` | `3` | traversal bound (keeps cyclic graphs finite) |
 | `QDRANT_URL` | _(unset)_ | set to use a Qdrant server instead of embedded |
 | `QDRANT_PATH` | `.qdrant` | embedded store dir, or `:memory:` |
 | `GROUNDED_MIN_SCORE` | `0.68` | abstention floor (tuned for `bge` on this corpus) |

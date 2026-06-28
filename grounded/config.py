@@ -45,5 +45,25 @@ class Settings:
 
     protected_topics: list[str] = field(default_factory=_topics)
 
+    # --- graph retrieval -----------------------------------------------------
+    # Retrieval mode: "vector" (default, unchanged), "graph", or "hybrid".
+    # Extractor: "rule" (deterministic, keyless, default) or "llm" (Claude).
+    # GRAPH_PATH: ":memory:" -> pure-python in-memory seam (no kuzu); any other
+    # value -> embedded KuzuDB at that directory. GRAPH_MAX_HOPS bounds traversal
+    # so cyclic relationships can't run away. These read the environment at
+    # instantiation (default_factory) so tests can switch mode per case.
+    retrieval_mode: str = field(
+        default_factory=lambda: os.environ.get("GROUNDED_RETRIEVAL_MODE", "vector")
+    )
+    extractor: str = field(
+        default_factory=lambda: os.environ.get("GROUNDED_EXTRACTOR", "rule")
+    )
+    graph_path: str = field(
+        default_factory=lambda: os.environ.get("GRAPH_PATH", ":memory:")
+    )
+    graph_max_hops: int = field(
+        default_factory=lambda: int(os.environ.get("GRAPH_MAX_HOPS", "3"))
+    )
+
 
 settings = Settings()
