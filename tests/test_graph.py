@@ -71,3 +71,78 @@ def test_rule_extractor_drops_project_whose_name_is_protected():
     doc = extract.Doc(name="ACME-SECRET", text="confidential uses Python.")
     triples = extract.extract([doc])
     assert triples == []
+
+
+# --- graph store + traversal (in-memory seam) ---------------------------------
+from grounded.graph import store as gstore
+
+
+@pytest.fixture
+def graph(monkeypatch):
+    gstore._backend.cache_clear()
+    gstore.reset()
+    yield gstore
+    gstore._backend.cache_clear()
+
+
+def _triple(s, p, o, st="Project", ot="Technology"):
+    return extract.Triple(s, st, p, o, ot)
+
+
+def test_store_builds_nodes_and_edges_from_triples(graph):
+    graph.add_triples([_triple("grounded", terms.USES, "Python")])
+    assert graph.has_node("grounded")
+    assert graph.has_node("Python")
+    assert not graph.has_node("nope")
+
+
+def test_shortest_path_between_two_projects_via_shared_tech(graph):
+    graph.add_triples([
+        _triple("grounded", terms.USES, "Python"),
+        _triple("tailored", terms.USES, "Python"),
+    ])
+    paths = graph.shortest_paths("grounded", "tailored", max_hops=3)
+    assert paths, "expected a connecting path"
+    nodes = paths[0].nodes()
+    assert nodes[0] == "grounded" and nodes[-1] == "tailored"
+    assert "Python" in nodes
+
+
+def test_no_path_within_max_hops_returns_empty(graph):
+    # a chain grounded-Python-tailored-Qdrant-other is 4 hops end-to-end
+    graph.add_triples([
+        _triple("grounded", terms.USES, "Python"),
+        _triple("tailored", terms.USES, "Python"),
+        _triple("tailored", terms.USES, "Qdrant"),
+        _triple("other", terms.USES, "Qdrant"),
+    ])
+    assert graph.shortest_paths("grounded", "other", max_hops=2) == []
+    assert graph.shortest_paths("grounded", "other", max_hops=4)
+
+
+def test_single_entity_neighbourhood(graph):
+    graph.add_triples([
+        _triple("grounded", terms.USES, "Python"),
+        _triple("grounded", terms.APPLIES, "RAG", ot="Concept"),
+    ])
+    nb = graph.neighbourhood("grounded")
+    reached = {p.nodes()[-1] for p in nb}
+    assert reached == {"Python", "RAG"}
+
+
+def test_empty_graph_queries_do_not_crash(graph):
+    assert graph.shortest_paths("a", "b", max_hops=3) == []
+    assert graph.neighbourhood("a") == []
+    assert not graph.has_node("a")
+
+
+def test_cyclic_graph_traversal_is_bounded(graph):
+    # a <-> b <-> c <-> a, all RELATED_TO; bounded hops must terminate
+    graph.add_triples([
+        _triple("a", terms.RELATED_TO, "b", ot="Project"),
+        _triple("b", terms.RELATED_TO, "c", ot="Project"),
+        _triple("c", terms.RELATED_TO, "a", ot="Project"),
+    ])
+    paths = graph.shortest_paths("a", "c", max_hops=3)
+    assert paths
+    assert min(len(p.steps) for p in paths) == 1  # a-c is direct
