@@ -9,9 +9,9 @@ from __future__ import annotations
 import re
 from itertools import combinations
 
-from ..config import settings
+from .. import config
 from . import store, terms
-from .store import GraphPath
+from .types import GraphPath
 
 
 def match_entities(question: str) -> list[str]:
@@ -39,7 +39,7 @@ def match_entities(question: str) -> list[str]:
 
 
 def graph_evidence(question: str, max_hops: int | None = None) -> list[GraphPath]:
-    hops = max_hops or settings.graph_max_hops
+    hops = max_hops or config.settings.graph_max_hops
     entities = match_entities(question)
     if not entities:
         return []

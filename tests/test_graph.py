@@ -60,8 +60,12 @@ def test_rule_extractor_ip_guards_protected_terms(monkeypatch):
     # A protected term that happens to be in the dictionary must never become a
     # node. We inject ACME-SECRET as a fake technology alias for this test only.
     monkeypatch.setitem(terms.TECHNOLOGIES, "ACME-SECRET", ["acme-secret"])
+    # the alias index is cached; clear it so the injected alias is compiled in,
+    # then clear again below so the (reverted) alias never leaks to later tests.
+    terms._alias_index.cache_clear()
     doc = extract.Doc(name="leaky", text="leaky uses Python and the ACME-SECRET engine.")
     triples = extract.extract([doc])
+    terms._alias_index.cache_clear()
     nodes = {t.subj for t in triples} | {t.obj for t in triples}
     assert "ACME-SECRET" not in nodes
     assert "Python" in nodes  # the clean term still lands
@@ -192,7 +196,24 @@ def test_graph_evidence_matches_dictionary_alias(built_graph):
 
 # --- end-to-end: graph mode through query.ask ---------------------------------
 from grounded import config
-from grounded.query import ABSTAIN, ask
+from grounded.query import ABSTAIN, _assemble, _path_to_hit, ask
+from grounded.graph.types import GraphPath, Step
+
+
+def test_assemble_assigns_contiguous_collision_free_ids_and_keeps_paths():
+    # vector hits arrive with arbitrary (here colliding) ids; _assemble is the
+    # one chokepoint that reissues a flat 0..n-1 id space across both kinds.
+    vhits = [
+        vstore.Hit(id=7, score=0.9, source="doc", heading="a", text="ta"),
+        vstore.Hit(id=7, score=0.8, source="doc", heading="b", text="tb"),
+    ]
+    paths = [GraphPath((Step("p", "USES", "Python", True),))]
+    out = _assemble(vhits, paths)
+    assert [h.id for h in out] == [0, 1, 2]  # contiguous, no collision
+    assert out[0].text == "ta" and out[1].text == "tb"  # vector fields preserved
+    assert out[2].source == "graph" and out[2].path == paths[0]  # path carried
+    # non-mutating: the caller's hits keep their original ids
+    assert [h.id for h in vhits] == [7, 7]
 
 
 @pytest.fixture
@@ -207,6 +228,17 @@ def test_graph_mode_multi_hop_answers_grounded_and_cited(graph_mode):
     assert ans.grounded
     assert ans.citations
     assert "ACME-SECRET" not in ans.text
+
+
+def test_graph_hit_carries_its_path_and_cited_paths_derive_from_it(graph_mode):
+    # The folded seam: each graph citation is self-describing -- it carries the
+    # GraphPath it was rendered from, and Answer.paths is just those paths.
+    ans = ask("how are grounded and tailored connected?")
+    graph_cites = [h for h in ans.citations if h.source == "graph"]
+    assert graph_cites and all(h.path is not None for h in graph_cites)
+    assert ans.paths == [h.path for h in graph_cites]
+    # a plain vector Hit defaults to no path
+    assert vstore.Hit(id=0, score=0.0, source="x", heading="h", text="t").path is None
 
 
 def test_graph_mode_no_path_abstains(graph_mode):

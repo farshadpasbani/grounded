@@ -10,11 +10,11 @@ so the same deterministic check covers chunks and paths alike.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import config, gate, generate
 from .graph import query as graph_query
-from .graph.store import GraphPath
+from .graph.types import GraphPath
 from .retrieve import retrieve
 from .store import Hit
 
@@ -30,11 +30,12 @@ class Answer:
     paths: list[GraphPath] = field(default_factory=list)
 
 
-def _path_to_hit(idx: int, path: GraphPath) -> Hit:
+def _path_to_hit(path: GraphPath) -> Hit:
     """A traversal path as a citeable piece of evidence. score=1.0: a real path
-    is a hard structural fact, not a similarity score."""
+    is a hard structural fact, not a similarity score. The id is a placeholder;
+    `_assemble` owns id assignment."""
     rendered = path.render()
-    return Hit(id=idx, score=1.0, source="graph", heading=rendered, text=rendered)
+    return Hit(id=0, score=1.0, source="graph", heading=rendered, text=rendered, path=path)
 
 
 def ask(question: str) -> Answer:
@@ -61,8 +62,13 @@ def _ask_vector(question: str) -> Answer:
     return Answer(result["answer"], grounded=True, citations=cited, reason=reason)
 
 
-def _answer_from_evidence(question: str, evidence: list[Hit], paths: list[GraphPath]) -> Answer:
-    """Generate over a fixed evidence set and gate the result."""
+def _answer_from_evidence(question: str, evidence: list[Hit]) -> Answer:
+    """Generate over a fixed evidence set and gate the result.
+
+    Evidence is self-describing: a graph hit carries its own `path`, so the
+    cited paths fall straight out of the cited hits -- no parallel list to
+    re-zip and keep aligned.
+    """
     if not evidence:
         return Answer(ABSTAIN, grounded=False, reason="no connecting path or chunk")
 
@@ -73,31 +79,26 @@ def _answer_from_evidence(question: str, evidence: list[Hit], paths: list[GraphP
 
     cited_ids = set(result["citations"])
     cited = [h for h in evidence if h.id in cited_ids]
-    cited_paths = [p for h, p in zip(_graph_hits(evidence), paths) if h.id in cited_ids] if paths else []
+    cited_paths = [h.path for h in cited if h.path]
     return Answer(result["answer"], grounded=True, citations=cited, reason=reason, paths=cited_paths)
 
 
-def _graph_hits(evidence: list[Hit]) -> list[Hit]:
-    return [h for h in evidence if h.source == "graph"]
+def _assemble(vector_hits: list[Hit], paths: list[GraphPath]) -> list[Hit]:
+    """The one place ids are assigned. Union of vector hits and graph paths into
+    a single evidence list with contiguous, collision-free ids -- so the gate's
+    citation check sees one flat id space. Vector hits keep their fields but are
+    reissued an id here; paths become path-carrying graph hits."""
+    evidence = list(vector_hits) + [_path_to_hit(p) for p in paths]
+    return [replace(h, id=i) for i, h in enumerate(evidence)]
 
 
 def _ask_graph(question: str) -> Answer:
     paths = graph_query.graph_evidence(question)
-    evidence = [_path_to_hit(i, p) for i, p in enumerate(paths)]
-    return _answer_from_evidence(question, evidence, paths)
+    return _answer_from_evidence(question, _assemble([], paths))
 
 
 def _ask_hybrid(question: str) -> Answer:
     vhits = retrieve(question)
     vgood = [] if gate.too_weak(vhits) else list(vhits)
     paths = graph_query.graph_evidence(question)
-
-    # Union into one evidence set with fresh, collision-free ids.
-    evidence: list[Hit] = []
-    for h in vgood:
-        evidence.append(h)
-    for p in paths:
-        evidence.append(_path_to_hit(0, p))  # id reassigned below
-    for i, h in enumerate(evidence):
-        h.id = i
-    return _answer_from_evidence(question, evidence, paths)
+    return _answer_from_evidence(question, _assemble(vgood, paths))

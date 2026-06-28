@@ -8,10 +8,20 @@ import math
 
 import pytest
 
-from grounded import embed, evaluate, gate, ingest, store
+from grounded import config, embed, evaluate, gate, ingest, store
 from grounded.config import settings
 from grounded.query import ABSTAIN, ask
 from grounded.retrieve import retrieve
+
+
+def test_reassigning_config_settings_flips_a_consumer(monkeypatch):
+    # Unified idiom: gate reads config.settings.min_score (not a stale import-time
+    # binding), so swapping in a fresh Settings flips it without reimporting.
+    hit = store.Hit(id=0, score=0.5, source="s", heading="h", text="t")
+    monkeypatch.setattr(config, "settings", config.Settings(min_score=0.4))
+    assert not gate.too_weak([hit])  # 0.5 >= 0.4
+    monkeypatch.setattr(config, "settings", config.Settings(min_score=0.9))
+    assert gate.too_weak([hit])  # 0.5 < 0.9
 
 
 # --- deterministic fake embedding: word-set -> sparse normalized vector --------
