@@ -228,3 +228,61 @@ def test_graph_mode_empty_graph_abstains_gracefully(monkeypatch, graph):
     ans = ask("how are grounded and tailored connected?")
     assert not ans.grounded
     assert ans.text == ABSTAIN
+
+
+# --- end-to-end: hybrid mode (vector hits UNION graph paths) ------------------
+import math
+
+from grounded import embed, ingest, store as vstore
+
+
+def _fake_vec(text: str) -> list[float]:
+    v = [0.0] * config.settings.embed_dim
+    for word in text.lower().split():
+        v[hash(word) % config.settings.embed_dim] += 1.0
+    norm = math.sqrt(sum(x * x for x in v)) or 1.0
+    return [x / norm for x in v]
+
+
+@pytest.fixture
+def hybrid_mode(monkeypatch, graph, tmp_path):
+    monkeypatch.setattr(embed, "embed", lambda texts: [_fake_vec(t) for t in texts])
+    monkeypatch.setattr(embed, "embed_one", lambda t: _fake_vec(t))
+    vstore._client.cache_clear()
+    # vector corpus: one doc about a topic with no graph entities
+    (tmp_path / "weather.md").write_text(
+        "# Weather notes\nThe rain in the valley falls on the quiet meadow each spring.\n"
+    )
+    src = tmp_path / "sources.yaml"
+    src.write_text(f"globs:\n  - '{tmp_path}/*.md'\n")
+    ingest.build(str(src))  # vector mode default for this build
+    # graph: grounded + tailored share Python
+    graph.add_triples([
+        extract.Triple("grounded", "Project", terms.USES, "Python", "Technology"),
+        extract.Triple("tailored", "Project", terms.USES, "Python", "Technology"),
+    ])
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "hybrid")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    yield
+    vstore._client.cache_clear()
+
+
+def test_hybrid_answers_when_only_graph_grounds(hybrid_mode):
+    # multi-hop question: no vector overlap, but a real graph path exists
+    ans = ask("how are grounded and tailored connected?")
+    assert ans.grounded
+    assert ans.paths  # grounded by a path
+    assert "ACME-SECRET" not in ans.text
+
+
+def test_hybrid_answers_when_only_vector_grounds(hybrid_mode):
+    # no known graph entity, but the vector corpus has the answer
+    ans = ask("what falls on the quiet meadow each spring?")
+    assert ans.grounded
+    assert ans.citations
+
+
+def test_hybrid_abstains_when_neither_grounds(hybrid_mode):
+    ans = ask("zxqw plooble grommet flarn unrelated nonsense")
+    assert not ans.grounded
+    assert ans.text == ABSTAIN
