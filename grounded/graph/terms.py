@@ -8,6 +8,7 @@ terms live here -- no codenames, no employer IP. Protected terms are env-only
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 # Predicate vocabulary. The rule extractor emits USES/APPLIES/RELATED_TO;
 # MENTIONS is reserved for the (secondary) llm extractor's generic co-occurrence.
@@ -47,8 +48,14 @@ Concept = "Concept"
 Project = "Project"
 
 
+@lru_cache(maxsize=1)
 def _alias_index() -> list[tuple[re.Pattern[str], str, str]]:
-    """(compiled whole-word pattern, canonical name, node type), longest first."""
+    """(compiled whole-word pattern, canonical name, node type), longest first.
+
+    Cached: the dictionary is static, so the patterns are compiled once and
+    reused across every scan. Tests that monkeypatch TECHNOLOGIES/CONCEPTS must
+    call `_alias_index.cache_clear()` around the change.
+    """
     entries: list[tuple[str, str, str]] = []
     for name, aliases in TECHNOLOGIES.items():
         for a in aliases:
@@ -68,7 +75,9 @@ def _alias_index() -> list[tuple[re.Pattern[str], str, str]]:
 def match_terms(text: str) -> list[tuple[str, str]]:
     """Distinct (canonical name, node type) pairs found in `text`.
 
-    Whole-word and case-insensitive. Order is deterministic (first appearance).
+    Whole-word and case-insensitive. Order is deterministic: canonical names are
+    returned in longest-alias-first order (the scan order of the alias index),
+    not in order of first appearance in `text`.
     """
     found: dict[str, str] = {}
     order: list[str] = []

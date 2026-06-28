@@ -57,7 +57,10 @@ def _build_vector(files: list[Path]) -> dict:
 
 
 def _build_graph(files: list[Path]) -> dict:
-    docs = [extract.Doc(name=_project_name(f, f.read_text()), text=f.read_text()) for f in files]
+    docs: list[extract.Doc] = []
+    for f in files:
+        text = f.read_text()  # read once: feed both the name derivation and the body
+        docs.append(extract.Doc(name=_project_name(f, text), text=text))
     triples = extract.extract(docs)  # ip-guarded inside the extractor
 
     gstore.reset()

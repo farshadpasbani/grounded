@@ -60,8 +60,12 @@ def test_rule_extractor_ip_guards_protected_terms(monkeypatch):
     # A protected term that happens to be in the dictionary must never become a
     # node. We inject ACME-SECRET as a fake technology alias for this test only.
     monkeypatch.setitem(terms.TECHNOLOGIES, "ACME-SECRET", ["acme-secret"])
+    # the alias index is cached; clear it so the injected alias is compiled in,
+    # then clear again below so the (reverted) alias never leaks to later tests.
+    terms._alias_index.cache_clear()
     doc = extract.Doc(name="leaky", text="leaky uses Python and the ACME-SECRET engine.")
     triples = extract.extract([doc])
+    terms._alias_index.cache_clear()
     nodes = {t.subj for t in triples} | {t.obj for t in triples}
     assert "ACME-SECRET" not in nodes
     assert "Python" in nodes  # the clean term still lands
