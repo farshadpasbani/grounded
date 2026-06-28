@@ -1,0 +1,68 @@
+"""Qdrant wrapper: create the collection, upsert chunks, search."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from functools import lru_cache
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams
+
+from .chunk import Chunk
+from .config import settings
+
+
+@dataclass
+class Hit:
+    id: int
+    score: float
+    source: str
+    heading: str
+    text: str
+
+
+@lru_cache(maxsize=1)
+def _client() -> QdrantClient:
+    # One shared client. Server mode if QDRANT_URL is set, otherwise embedded
+    # (a local directory) — embedded mode keeps a single open handle, so the
+    # cache here is load-bearing, not just an optimisation.
+    if settings.qdrant_url:
+        return QdrantClient(url=settings.qdrant_url)
+    if settings.qdrant_path == ":memory:":
+        return QdrantClient(location=":memory:")
+    return QdrantClient(path=settings.qdrant_path)
+
+
+def reset_collection() -> None:
+    c = _client()
+    if c.collection_exists(settings.collection):
+        c.delete_collection(settings.collection)
+    c.create_collection(
+        collection_name=settings.collection,
+        vectors_config=VectorParams(size=settings.embed_dim, distance=Distance.COSINE),
+    )
+
+
+def upsert(chunks: list[Chunk], vectors: list[list[float]]) -> None:
+    points = [
+        PointStruct(
+            id=i,
+            vector=vec,
+            payload={"source": ch.source, "heading": ch.heading, "text": ch.text},
+        )
+        for i, (ch, vec) in enumerate(zip(chunks, vectors))
+    ]
+    _client().upsert(collection_name=settings.collection, points=points)
+
+
+def search(vector: list[float], k: int) -> list[Hit]:
+    res = _client().query_points(collection_name=settings.collection, query=vector, limit=k)
+    return [
+        Hit(
+            id=p.id,
+            score=p.score,
+            source=p.payload["source"],
+            heading=p.payload["heading"],
+            text=p.payload["text"],
+        )
+        for p in res.points
+    ]

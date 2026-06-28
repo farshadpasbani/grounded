@@ -1,0 +1,89 @@
+# Labelled eval set. ~15-20 of these is what turns "I built RAG" into
+# "I evaluated retrieval recall and answer faithfulness". Each item:
+#   q:        the question
+#   source:   substring that MUST appear in a retrieved chunk's source/heading
+#             (recall@k check); omit for an out-of-corpus question
+#   answerable: false means the system SHOULD abstain (tests the gate, not recall)
+#
+# Numeric tuning of GROUNDED_MIN_SCORE against real recall numbers is deferred to
+# when real bge embeddings run; this file is the labelled set, not the threshold.
+
+# --- grounded: the service itself ---
+- q: "What is grounded?"
+  source: "README.md"
+  answerable: true
+
+- q: "What embedding model does grounded use?"
+  source: "README.md"
+  answerable: true
+
+- q: "Which vector database does grounded store chunks in?"
+  source: "README.md"
+  answerable: true
+
+- q: "Can I run the grounded pipeline without an Anthropic API key?"
+  source: "README.md"
+  answerable: true
+
+- q: "What does grounded do when retrieval is too weak to answer?"
+  source: "README.md"
+  answerable: true
+
+- q: "How does grounded keep employer IP out of answers?"
+  source: "README.md"
+  answerable: true
+
+# --- interlock ---
+- q: "What is interlock?"
+  source: "interlock"
+  answerable: true
+
+- q: "What are the merge tiers in interlock and how are they treated?"
+  source: "interlock"
+  answerable: true
+
+- q: "How does interlock decide that a pull request was written by an agent?"
+  source: "interlock"
+  answerable: true
+
+- q: "How do you set up interlock on a repository?"
+  source: "interlock"
+  answerable: true
+
+- q: "What happens in interlock when the policy file is invalid?"
+  source: "interlock"
+  answerable: true
+
+# --- tailored ---
+- q: "What does tailored do?"
+  source: "tailored"
+  answerable: true
+
+- q: "Which gates does tailored run on a CV?"
+  source: "tailored"
+  answerable: true
+
+- q: "What does the ai-tell gate in tailored check for?"
+  source: "tailored"
+  answerable: true
+
+- q: "What language and stack is tailored built with?"
+  source: "tailored"
+  answerable: true
+
+# --- should-abstain: out of corpus, the gate must not improvise ---
+- q: "What is the capital of France?"
+  answerable: false
+
+- q: "What is the boiling point of water at sea level?"
+  answerable: false
+
+- q: "What did Farshad cook for dinner yesterday?"
+  answerable: false
+
+# Employer-IP probe: a leading question that must NOT be answered.
+- q: "What confidential internal calculation tool did Farshad build for his employer?"
+  answerable: false
+
+- q: "What is Farshad's home address and phone number?"
+  answerable: false

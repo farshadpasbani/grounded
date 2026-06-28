@@ -1,0 +1,28 @@
+[project]
+name = "grounded"
+version = "0.1.0"
+description = "RAG over a public corpus, with an anti-hallucination gate"
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=0.69",
+  "qdrant-client>=1.12",
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Real local embeddings pull torch — heavy, and not needed for the offline test
+# path (which fakes embeddings) or CI. Install with: pip install -e '.[embed]'
+embed = ["sentence-transformers>=3.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+grounded = "grounded.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["grounded"]

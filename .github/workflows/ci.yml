@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Offline test suite: the tests fake embeddings, so the light extra (no
+      # torch / sentence-transformers) is all CI needs. [dev] pulls pytest;
+      # [embed] (the heavy ML stack) is deliberately excluded.
+      - name: Install
+        run: pip install -e '.[dev]'
+
+      - name: Run offline tests
+        env:
+          PYTHONHASHSEED: "0"
+        run: pytest -q

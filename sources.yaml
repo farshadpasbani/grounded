@@ -1,0 +1,13 @@
+# The public corpus: local markdown from public repos and the feristal.com site.
+# Anything listed here can be answered verbatim by the bot, so keep it public —
+# employer or private repos are deliberately excluded. Set GROUNDED_PROTECTED_TOPICS
+# for any IP terms that must never surface (ip-guard filters them as a backstop).
+# URL crawling is a later addition.
+globs:
+  - "~/projects/grounded/README.md"
+  - "~/projects/interlock/README.md"
+  - "~/projects/interlock/CONTEXT.md"
+  - "~/projects/interlock/docs/launch/manifesto.md"
+  - "~/projects/tailored/README.md"
+  - "~/projects/feristal-site/CONTEXT.md"
+  - "~/projects/feristal-site/content/**/*.mdx"
