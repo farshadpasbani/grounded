@@ -28,10 +28,14 @@ def _load_sources(sources_path: str) -> list[Path]:
 
 
 def _project_name(path: Path, text: str) -> str:
-    """Project node name: the first markdown heading, else the filename stem."""
+    """Project node name: the first non-empty markdown heading, else the filename
+    stem. An empty heading (`## ` / hashes-only) must not yield a "" node -- that
+    would match every question's whole-word regex and silently ground junk."""
     for line in text.splitlines():
         if line.lstrip().startswith("#"):
-            return line.lstrip("# ").strip()
+            name = line.lstrip("# ").strip()
+            if name:
+                return name
     return path.stem
 
 

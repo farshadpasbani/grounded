@@ -346,3 +346,18 @@ def test_graph_pipeline_is_keyless_no_heavy_imports(monkeypatch, graph, tmp_path
     assert "anthropic" not in sys.modules
     assert "kuzu" not in sys.modules
     assert "torch" not in sys.modules
+
+
+# --- regression: empty project name must not ground unrelated questions --------
+def test_empty_heading_project_name_does_not_ground(monkeypatch, graph, tmp_path):
+    # first heading is hashes/whitespace only -> derived name would be ""
+    (tmp_path / "blank.md").write_text("## \nthis doc is built with Python.\n")
+    src = tmp_path / "sources.yaml"
+    src.write_text(f"globs:\n  - '{tmp_path}/*.md'\n")
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    ingest.build(str(src))
+    assert "" not in graph.node_names()  # no empty-named node ever enters the graph
+    ans = ask("what is the capital of France?")  # unrelated; nothing should match
+    assert not ans.grounded
+    assert ans.text == ABSTAIN
