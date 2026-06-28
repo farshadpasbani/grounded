@@ -310,3 +310,24 @@ def test_graph_mode_ingest_builds_graph_and_ip_guards(monkeypatch, graph, tmp_pa
     # the freshly built graph answers a multi-hop question
     ans = ask("how are grounded and tailored connected?")
     assert ans.grounded
+
+
+# --- graph eval: graph-recall + groundedness ----------------------------------
+from grounded import evaluate
+
+
+def test_graph_eval_reports_recall_and_groundedness(monkeypatch, built_graph, tmp_path):
+    monkeypatch.setenv("GROUNDED_RETRIEVAL_MODE", "graph")
+    monkeypatch.setattr(config, "settings", config.Settings())
+    eval_file = tmp_path / "graph_questions.yaml"
+    eval_file.write_text(
+        "- q: 'how are grounded and tailored connected?'\n"
+        "  entities: ['grounded', 'tailored']\n"
+        "  answerable: true\n"
+        "- q: 'connect grounded and lonely'\n"
+        "  answerable: false\n"
+    )
+    monkeypatch.setattr(evaluate, "GRAPH_EVAL_FILE", eval_file)
+    metrics = evaluate.run_graph()
+    assert metrics["graph_recall"] == (1, 1)
+    assert metrics["groundedness"] == (2, 2)
