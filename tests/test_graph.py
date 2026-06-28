@@ -361,3 +361,70 @@ def test_empty_heading_project_name_does_not_ground(monkeypatch, graph, tmp_path
     ans = ask("what is the capital of France?")  # unrelated; nothing should match
     assert not ans.grounded
     assert ans.text == ABSTAIN
+
+
+# --- backend conformance: in-memory seam MUST behave identically to kuzu -------
+# The kuzu param auto-skips when the wheel isn't importable, so keyless CI stays
+# green and memory-only; run under .venv313 ('.[dev,graph]') to exercise kuzu.
+from grounded.graph.store import InMemoryGraph
+
+
+def _make_backend(kind, tmp_path):
+    if kind == "memory":
+        return InMemoryGraph()
+    pytest.importorskip("kuzu")
+    from grounded.graph.kuzu_store import KuzuGraph
+
+    return KuzuGraph(str(tmp_path / "kuzu_db"))
+
+
+@pytest.fixture(params=["memory", "kuzu"])
+def backend(request, tmp_path):
+    b = _make_backend(request.param, tmp_path)
+    b.reset()
+    return b
+
+
+def _diamond(b):
+    # two distinct shortest paths a..b: a-x-b and a-y-b (both length 2)
+    b.add_triples([
+        extract.Triple("a", "Project", terms.USES, "x", "Technology"),
+        extract.Triple("bb", "Project", terms.USES, "x", "Technology"),
+        extract.Triple("a", "Project", terms.USES, "y", "Technology"),
+        extract.Triple("bb", "Project", terms.USES, "y", "Technology"),
+    ])
+
+
+def test_backend_build_stats_and_nodes(backend):
+    _diamond(backend)
+    assert backend.stats() == {"nodes": 4, "edges": 4}
+    assert backend.node_names() == {"a", "bb", "x", "y"}
+    assert backend.has_node("a") and not backend.has_node("zzz")
+    assert backend.node_type("x") == "Technology"
+    assert backend.node_type("a") == "Project"
+
+
+def test_backend_neighbourhood(backend):
+    _diamond(backend)
+    nb = backend.neighbourhood("a")
+    assert {p.nodes()[-1] for p in nb} == {"x", "y"}
+
+
+def test_backend_no_path_is_empty(backend):
+    backend.add_triples([
+        extract.Triple("a", "Project", terms.USES, "x", "Technology"),
+        extract.Triple("c", "Project", terms.USES, "z", "Technology"),
+    ])
+    assert backend.shortest_paths("a", "c", 3) == []
+    assert backend.shortest_paths("nope", "alsonope", 3) == []
+
+
+def test_backend_returns_all_minimal_shortest_paths(backend):
+    # THE parity case: both intermediate hops are equally short, so a correct
+    # backend returns BOTH paths. kuzu's plain SHORTEST returns only one.
+    _diamond(backend)
+    paths = backend.shortest_paths("a", "bb", 3)
+    assert all(len(p.steps) == 2 for p in paths)
+    middles = {tuple(p.nodes()[1:-1]) for p in paths}
+    assert middles == {("x",), ("y",)}
+    assert len(paths) == 2

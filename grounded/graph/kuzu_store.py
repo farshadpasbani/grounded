@@ -89,8 +89,11 @@ class KuzuGraph:
     def shortest_paths(self, a: str, b: str, max_hops: int) -> list[GraphPath]:
         if not self.has_node(a) or not self.has_node(b) or a == b:
             return []
+        # ALL SHORTEST: return every minimal-length path, matching
+        # InMemoryGraph.shortest_paths. Plain SHORTEST returns only one, which
+        # would diverge from the seam when two equally-short paths exist.
         res = self._conn.execute(
-            f"MATCH p = (x:Entity {{name: $a}})-[:REL* SHORTEST 1..{max_hops}]-"
+            f"MATCH p = (x:Entity {{name: $a}})-[:REL* ALL SHORTEST 1..{max_hops}]-"
             "(y:Entity {name: $b}) RETURN nodes(p), rels(p)",
             {"a": a, "b": b},
         )
