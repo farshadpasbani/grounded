@@ -16,19 +16,28 @@ def _topics() -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
+    # Every env-driven field reads the environment at instantiation time, via
+    # default_factory, so `config.Settings()` re-reads a changed environment
+    # uniformly -- and a test that swaps in a fresh `config.settings` flips
+    # every consumer at once. Pure constants (no env) stay as plain defaults.
+
     # Vector store. Default to embedded Qdrant (a local directory, no Docker).
     # Set QDRANT_URL to point at a running server instead.
-    qdrant_url: str = os.environ.get("QDRANT_URL", "")
-    qdrant_path: str = os.environ.get("QDRANT_PATH", ".qdrant")
-    collection: str = os.environ.get("GROUNDED_COLLECTION", "grounded")
+    qdrant_url: str = field(default_factory=lambda: os.environ.get("QDRANT_URL", ""))
+    qdrant_path: str = field(default_factory=lambda: os.environ.get("QDRANT_PATH", ".qdrant"))
+    collection: str = field(default_factory=lambda: os.environ.get("GROUNDED_COLLECTION", "grounded"))
 
-    embed_model: str = os.environ.get("GROUNDED_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    embed_model: str = field(
+        default_factory=lambda: os.environ.get("GROUNDED_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    )
     embed_dim: int = 384  # bge-small-en-v1.5
 
     # Generation backend: "stub" needs no API key (deterministic, for offline
     # development and tests); "claude" is the production path.
-    generator: str = os.environ.get("GROUNDED_GENERATOR", "stub")
-    gen_model: str = os.environ.get("GROUNDED_GEN_MODEL", "claude-opus-4-8")
+    generator: str = field(default_factory=lambda: os.environ.get("GROUNDED_GENERATOR", "stub"))
+    gen_model: str = field(
+        default_factory=lambda: os.environ.get("GROUNDED_GEN_MODEL", "claude-opus-4-8")
+    )
 
     # Chunking, in words (cheap, dependency-free; good enough for short docs).
     chunk_words: int = 200
@@ -41,7 +50,9 @@ class Settings:
     # <=0.65 (the employer-IP probe is the closest, ~0.65), so 0.68 sits in the
     # gap with margin and gives 20/20 groundedness. Re-tune if you change the
     # embedder or the corpus.
-    min_score: float = float(os.environ.get("GROUNDED_MIN_SCORE", "0.68"))
+    min_score: float = field(
+        default_factory=lambda: float(os.environ.get("GROUNDED_MIN_SCORE", "0.68"))
+    )
 
     protected_topics: list[str] = field(default_factory=_topics)
 
@@ -50,8 +61,7 @@ class Settings:
     # Extractor: "rule" (deterministic, keyless, default) or "llm" (Claude).
     # GRAPH_PATH: ":memory:" -> pure-python in-memory seam (no kuzu); any other
     # value -> embedded KuzuDB at that directory. GRAPH_MAX_HOPS bounds traversal
-    # so cyclic relationships can't run away. These read the environment at
-    # instantiation (default_factory) so tests can switch mode per case.
+    # so cyclic relationships can't run away.
     retrieval_mode: str = field(
         default_factory=lambda: os.environ.get("GROUNDED_RETRIEVAL_MODE", "vector")
     )

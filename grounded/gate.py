@@ -7,14 +7,13 @@ Two failure modes it closes:
 """
 from __future__ import annotations
 
-from . import ipguard
-from .config import settings
+from . import config, ipguard
 from .store import Hit
 
 
 def too_weak(hits: list[Hit]) -> bool:
     """No hit, or the best one is below the confidence floor."""
-    return not hits or hits[0].score < settings.min_score
+    return not hits or hits[0].score < config.settings.min_score
 
 
 def verdict(answer: dict, retrieved_ids: set[int]) -> tuple[bool, str]:

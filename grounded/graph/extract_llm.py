@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ..config import settings
+from .. import config
 from . import terms
 from .extract import Doc, Triple
 
@@ -57,7 +57,7 @@ def extract_llm(docs: list[Doc]) -> list[Triple]:
         if not ipguard.is_clean(doc.name):
             continue
         msg = client.messages.create(
-            model=settings.gen_model,
+            model=config.settings.gen_model,
             max_tokens=2048,
             system=_SYSTEM,
             output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},

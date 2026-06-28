@@ -11,7 +11,7 @@ can verify groundedness deterministically.
 """
 from __future__ import annotations
 
-from .config import settings
+from . import config
 from .store import Hit
 
 _SYSTEM = (
@@ -63,7 +63,7 @@ def _claude(question: str, hits: list[Hit]) -> dict:
 
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     msg = client.messages.create(
-        model=settings.gen_model,  # swap to claude-haiku-4-5 to cut cost
+        model=config.settings.gen_model,  # swap to claude-haiku-4-5 to cut cost
         max_tokens=1024,
         system=_SYSTEM,
         output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
@@ -80,7 +80,9 @@ _BACKENDS = {"stub": _stub, "claude": _claude}
 
 def generate(question: str, hits: list[Hit]) -> dict:
     try:
-        backend = _BACKENDS[settings.generator]
+        backend = _BACKENDS[config.settings.generator]
     except KeyError:
-        raise ValueError(f"unknown GROUNDED_GENERATOR={settings.generator!r}; choose {list(_BACKENDS)}")
+        raise ValueError(
+            f"unknown GROUNDED_GENERATOR={config.settings.generator!r}; choose {list(_BACKENDS)}"
+        )
     return backend(question, hits)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .config import settings
+from . import config
 
 
 @dataclass
@@ -36,6 +36,6 @@ def chunk_markdown(source: str, markdown: str) -> list[Chunk]:
     out: list[Chunk] = []
     for heading, body in _sections(markdown):
         words = body.split()
-        for window in _window(words, settings.chunk_words, settings.chunk_overlap):
+        for window in _window(words, config.settings.chunk_words, config.settings.chunk_overlap):
             out.append(Chunk(source=source, heading=heading, text=" ".join(window)))
     return out

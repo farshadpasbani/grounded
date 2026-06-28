@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from .config import settings
+from . import config
 from .graph.query import graph_evidence
 from .query import ask
 from .retrieve import retrieve
@@ -32,7 +32,7 @@ def run() -> dict:
         # recall@k: is the expected source somewhere in the top-k?
         if answerable and item.get("source"):
             recall_total += 1
-            hits = retrieve(q, settings.top_k)
+            hits = retrieve(q, config.settings.top_k)
             if any(item["source"] in f"{h.source} {h.heading}" for h in hits):
                 recall_hits += 1
 
@@ -43,7 +43,7 @@ def run() -> dict:
         else:
             print(f"  MISS  answerable={answerable} grounded={a.grounded}  {q!r}  ({a.reason})")
 
-    print(f"\nrecall@{settings.top_k}: {recall_hits}/{recall_total}")
+    print(f"\nrecall@{config.settings.top_k}: {recall_hits}/{recall_total}")
     print(f"groundedness: {grounded_ok}/{len(items)}")
     return {
         "recall_at_k": (recall_hits, recall_total),

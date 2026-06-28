@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from .config import settings
+from . import config
 
 
 @lru_cache(maxsize=1)
@@ -16,7 +16,7 @@ def _model():
             "pip install -e '.[embed]'  (needs a torch-supported Python)."
         ) from e
 
-    return SentenceTransformer(settings.embed_model)
+    return SentenceTransformer(config.settings.embed_model)
 
 
 def embed(texts: list[str]) -> list[list[float]]:

@@ -12,8 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 
-from .. import ipguard
-from ..config import settings
+from .. import config, ipguard
 from . import terms
 
 
@@ -71,7 +70,7 @@ _BACKENDS = {"rule": _rule, "llm": _llm}
 
 
 def extract(docs: list[Doc], backend: str | None = None) -> list[Triple]:
-    name = backend or settings.extractor
+    name = backend or config.settings.extractor
     try:
         fn = _BACKENDS[name]
     except KeyError:

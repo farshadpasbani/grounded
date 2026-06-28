@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import deque
 from functools import lru_cache
 
-from ..config import settings
+from .. import config
 from .extract import Triple
 from .types import GraphPath, Step  # re-exported: `from .store import GraphPath` still resolves
 
@@ -91,11 +91,11 @@ class InMemoryGraph:
 
 @lru_cache(maxsize=1)
 def _backend():
-    if settings.graph_path == ":memory:":
+    if config.settings.graph_path == ":memory:":
         return InMemoryGraph()
     from .kuzu_store import KuzuGraph  # lazy: only when an embedded path is set
 
-    return KuzuGraph(settings.graph_path)
+    return KuzuGraph(config.settings.graph_path)
 
 
 def reset() -> None:
